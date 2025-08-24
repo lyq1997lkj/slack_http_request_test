@@ -1,38 +1,5 @@
 // Vercel serverless function to handle Slack events
-import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-
-const MAX_REQUESTS = 2;
-const HISTORY_FILE = '/tmp/request_history.json';
-
-function getStoredHistory() {
-    try {
-        if (existsSync(HISTORY_FILE)) {
-            const data = readFileSync(HISTORY_FILE, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.log('Error reading history file:', error);
-    }
-    return [];
-}
-
-function saveHistory(history) {
-    try {
-        writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
-    } catch (error) {
-        console.log('Error saving history file:', error);
-    }
-}
-
-function addToHistory(requestData) {
-    const history = getStoredHistory();
-    history.unshift(requestData);
-    if (history.length > MAX_REQUESTS) {
-        history.splice(MAX_REQUESTS);
-    }
-    saveHistory(history);
-}
+import { addRequest, getRequests, clearRequests } from './storage.js';
 
 export default function handler(req, res) {
     // 记录所有请求（包括GET请求用于调试）
@@ -45,7 +12,7 @@ export default function handler(req, res) {
         url: req.url
     };
     
-    addToHistory(requestData);
+    addRequest(requestData);
     
     // 只处理POST请求
     if (req.method === 'POST') {
@@ -204,9 +171,9 @@ function handleReactionAddedEvent(event, context) {
 
 // 导出函数供其他API使用
 export function getRequestHistory() {
-    return getStoredHistory();
+    return getRequests();
 }
 
 export function clearRequestHistory() {
-    saveHistory([]);
+    clearRequests();
 }

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>详细调试信息</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 详细调试信息</h1>
+    
+    <div class="section">
+        <h3>1. API端点测试</h3>
+        <button onclick="testWebhook()">测试Webhook端点</button>
+        <button onclick="testRequests()">测试请求历史API</button>
+        <div id="api-results"></div>
+    </div>
+    
+    <div class="section">
+        <h3>2. 发送测试请求</h3>
+        <button onclick="sendTestRequest()">发送测试POST请求</button>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="section">
+        <h3>3. 当前请求历史</h3>
+        <button onclick="loadHistory()">加载请求历史</button>
+        <div id="history-results"></div>
+    </div>
+    
+    <div class="section">
+        <h3>4. Slack配置检查</h3>
+        <div class="info">
+            <strong>你的Webhook URL:</strong><br>
+            <code id="webhook-url"></code><br><br>
+            <strong>检查清单:</strong><br>
+            ✅ Slack Event Subscriptions 已启用<br>
+            ✅ Request URL 验证成功<br>
+            ✅ 订阅了 message.channels 事件<br>
+            ✅ 机器人已被邀请到频道<br>
+            ✅ 在频道中发送了消息或@提及机器人
+        </div>
+    </div>
+
+    <script>
+        // 显示当前的webhook URL
+        document.getElementById('webhook-url').textContent = window.location.origin + '/slack/events';
+        
+        async function testWebhook() {
+            const resultsDiv = document.getElementById('api-results');
+            try {
+                const response = await fetch('/api/webhook');
+                const data = await response.json();
+                resultsDiv.innerHTML = `<div class="success">✅ Webhook端点正常工作<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Webhook端点错误: ${error.message}</div>`;
+            }
+        }
+        
+        async function testRequests() {
+            const resultsDiv = document.getElementById('api-results');
+            try {
+                const response = await fetch('/api/requests');
+                const data = await response.json();
+                resultsDiv.innerHTML += `<div class="success">✅ 请求历史API正常<pre>返回 ${data.length} 条记录</pre></div>`;
+            } catch (error) {
+                resultsDiv.innerHTML += `<div class="error">❌ 请求历史API错误: ${error.message}</div>`;
+            }
+        }
+        
+        async function sendTestRequest() {
+            const resultsDiv = document.getElementById('test-results');
+            try {
+                const response = await fetch('/api/webhook', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Slack-Signature': 'v0=test_signature',
+                        'X-Slack-Request-Timestamp': Math.floor(Date.now() / 1000).toString()
+                    },
+                    body: JSON.stringify({
+                        token: 'test_token',
+                        team_id: 'T1234567890',
+                        api_app_id: 'A1234567890',
+                        event_id: 'Ev' + Date.now(),
+                        event_time: Math.floor(Date.now() / 1000),
+                        type: 'event_callback',
+                        authed_users: ['U1234567890'],
+                        event: {
+                            type: 'message',
+                            channel: 'C1234567890',
+                            user: 'U1234567890',
+                            text: '这是一条测试消息 - ' + new Date().toLocaleString(),
+                            ts: (Date.now() / 1000).toFixed(6),
+                            event_ts: (Date.now() / 1000).toFixed(6)
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                resultsDiv.innerHTML = `<div class="success">✅ 测试请求发送成功<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                
+                // 等待1秒后自动加载历史
+                setTimeout(loadHistory, 1000);
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ 测试请求失败: ${error.message}</div>`;
+            }
+        }
+        
+        async function loadHistory() {
+            const resultsDiv = document.getElementById('history-results');
+            try {
+                const response = await fetch('/api/requests');
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    resultsDiv.innerHTML = `<div class="info">📝 暂无请求记录</div>`;
+                } else {
+                    resultsDiv.innerHTML = `<div class="success">📋 找到 ${data.length} 条请求记录<pre>${JSON.stringify(data, null, 2)}</pre></div>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ 加载历史失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 页面加载时自动测试
+        window.onload = function() {
+            testWebhook();
+            testRequests();
+        };
+    </script>
+</body>
+</html>
