@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>部署验证</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Slack调试工具部署验证</h1>
+    
+    <div id="results">
+        <div class="status info">正在检查部署状态...</div>
+    </div>
+
+    <script>
+        async function checkDeployment() {
+            const results = document.getElementById('results');
+            let html = '';
+            
+            // 检查主页面
+            try {
+                const response = await fetch('/');
+                if (response.ok) {
+                    html += '<div class="status success">✅ 主页面正常</div>';
+                } else {
+                    html += '<div class="status error">❌ 主页面异常</div>';
+                }
+            } catch (error) {
+                html += '<div class="status error">❌ 主页面无法访问</div>';
+            }
+            
+            // 检查API端点
+            try {
+                const response = await fetch('/api/webhook');
+                if (response.ok) {
+                    const data = await response.json();
+                    html += '<div class="status success">✅ API端点正常</div>';
+                    html += `<div class="status info">📡 API响应: ${data.message}</div>`;
+                } else {
+                    html += '<div class="status error">❌ API端点异常</div>';
+                }
+            } catch (error) {
+                html += '<div class="status error">❌ API端点无法访问</div>';
+            }
+            
+            // 检查测试页面
+            try {
+                const response = await fetch('/test.html');
+                if (response.ok) {
+                    html += '<div class="status success">✅ 测试页面正常</div>';
+                } else {
+                    html += '<div class="status error">❌ 测试页面异常</div>';
+                }
+            } catch (error) {
+                html += '<div class="status error">❌ 测试页面无法访问</div>';
+            }
+            
+            // 显示当前URL
+            html += `<div class="status info">🌐 当前域名: ${window.location.origin}</div>`;
+            html += `<div class="status info">🔗 Slack配置URL: ${window.location.origin}/slack/events</div>`;
+            
+            results.innerHTML = html;
+        }
+        
+        checkDeployment();
+    </script>
+</body>
+</html>

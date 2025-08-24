@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slack事件调试器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .request-item {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+
+        .request-item.url-verification {
+            border-color: #4CAF50;
+            background: #f0f8f0;
+        }
+
+        .request-item.event-callback {
+            border-color: #2196F3;
+            background: #f0f4f8;
+        }
+
+        .request-header {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .json-content {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .status {
+            padding: 20px;
+            text-align: center;
+            color: #666;
+        }
+
+        .refresh-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .refresh-btn:hover {
+            background: #45a049;
+        }
+
+        .clear-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .clear-btn:hover {
+            background: #da190b;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Slack事件调试器</h1>
+        <p>显示最近的2个HTTP POST请求，用于调试Slack机器人问题</p>
+
+        <div>
+            <button class="refresh-btn" onclick="loadRequests()">刷新请求</button>
+            <button class="clear-btn" onclick="clearRequests()">清空记录</button>
+        </div>
+
+        <div id="requests-container">
+            <div class="status">正在加载请求数据...</div>
+        </div>
+    </div>
+
+    <script>
+        async function loadRequests() {
+            try {
+                const response = await fetch('/api/requests');
+                const requests = await response.json();
+
+                const container = document.getElementById('requests-container');
+
+                if (requests.length === 0) {
+                    container.innerHTML = '<div class="status">暂无请求记录</div>';
+                    return;
+                }
+
+                container.innerHTML = requests.map((req, index) => {
+                    const requestType = req.body?.type || 'unknown';
+                    const cssClass = requestType === 'url_verification' ? 'url-verification' :
+                        requestType === 'event_callback' ? 'event-callback' : '';
+
+                    let typeLabel = '';
+                    if (requestType === 'url_verification') {
+                        typeLabel = ' - URL验证';
+                    } else if (requestType === 'event_callback') {
+                        typeLabel = ' - 事件回调';
+                    }
+
+                    return `
+                    <div class="request-item ${cssClass}">
+                        <div class="request-header">
+                            <span>请求 #${requests.length - index} (${req.method}${typeLabel})</span>
+                            <span class="timestamp">${new Date(req.timestamp).toLocaleString('zh-CN')}</span>
+                        </div>
+                        ${req.url ? `<div><strong>URL:</strong> ${req.url}</div>` : ''}
+                        ${requestType === 'url_verification' && req.body?.challenge ?
+                            `<div style="background: #e8f5e8; padding: 8px; border-radius: 4px; margin: 8px 0;">
+                                <strong>✅ URL验证挑战:</strong> ${req.body.challenge}
+                            </div>` : ''}
+                        ${requestType === 'event_callback' && req.body?.event ?
+                            `<div style="background: #e8f4f8; padding: 8px; border-radius: 4px; margin: 8px 0;">
+                                <strong>📨 事件详情:</strong><br>
+                                <strong>类型:</strong> ${req.body.event.type || 'unknown'}
+                                ${req.body.event.subtype ? `<br><strong>子类型:</strong> ${req.body.event.subtype}` : ''}
+                                ${req.body.team_id ? `<br><strong>团队ID:</strong> ${req.body.team_id}` : ''}
+                                ${req.body.api_app_id ? `<br><strong>应用ID:</strong> ${req.body.api_app_id}` : ''}
+                                ${req.body.event.user ? `<br><strong>用户:</strong> ${req.body.event.user}` : ''}
+                                ${req.body.event.channel ? `<br><strong>频道:</strong> ${req.body.event.channel}` : ''}
+                                ${req.body.event.text ? `<br><strong>消息:</strong> ${req.body.event.text.length > 100 ? req.body.event.text.substring(0, 100) + '...' : req.body.event.text}` : ''}
+                                ${req.body.event.ts ? `<br><strong>时间戳:</strong> ${req.body.event.ts}` : ''}
+                                ${req.body.event_id ? `<br><strong>事件ID:</strong> ${req.body.event_id}` : ''}
+                            </div>` : ''}
+                        <div><strong>Headers:</strong></div>
+                        <div class="json-content">${JSON.stringify(req.headers, null, 2)}</div>
+                        <div><strong>Body:</strong></div>
+                        <div class="json-content">${JSON.stringify(req.body, null, 2)}</div>
+                    </div>
+                `;
+                }).join('');
+
+            } catch (error) {
+                document.getElementById('requests-container').innerHTML =
+                    `<div class="status">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        async function clearRequests() {
+            try {
+                await fetch('/api/clear', { method: 'POST' });
+                loadRequests();
+            } catch (error) {
+                alert('清空失败: ' + error.message);
+            }
+        }
+
+        // 页面加载时获取数据
+        loadRequests();
+
+        // 每30秒自动刷新
+        setInterval(loadRequests, 30000);
+    </script>
+</body>
+
+</html>
