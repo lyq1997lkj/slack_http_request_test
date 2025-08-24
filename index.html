@@ -38,6 +38,21 @@
             border-color: #2196F3;
             background: #f0f4f8;
         }
+        .request-item.slack-request { 
+            border: 2px solid #28a745 !important; 
+            background: #d4edda !important; 
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
+        }
+        .source-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .source-slack { background: #28a745; color: white; }
+        .source-browser { background: #6c757d; color: white; }
 
         .request-header {
             font-weight: bold;
@@ -119,15 +134,9 @@
     <script>
         async function loadRequests() {
             try {
-                // 先尝试从requests API获取
-                let response = await fetch('/api/requests');
-                let requests = await response.json();
-                
-                // 如果没有数据，尝试从webhook获取
-                if (!requests || requests.length === 0) {
-                    response = await fetch('/api/webhook?history=true');
-                    requests = await response.json();
-                }
+                // 使用新的一体化API
+                const response = await fetch('/api/all-in-one?action=history');
+                const requests = await response.json();
 
                 const container = document.getElementById('requests-container');
 
@@ -137,45 +146,45 @@
                 }
 
                 container.innerHTML = requests.map((req, index) => {
-                    const requestType = req.body?.type || 'unknown';
-                    const cssClass = requestType === 'url_verification' ? 'url-verification' :
-                        requestType === 'event_callback' ? 'event-callback' : '';
-
-                    let typeLabel = '';
-                    if (requestType === 'url_verification') {
-                        typeLabel = ' - URL验证';
+                    const source = req.source || { source: '未知', isSlack: false, confidence: 'low', details: '' };
+                    const requestType = req.eventType || 'unknown';
+                    
+                    let cssClass = '';
+                    if (source.isSlack) {
+                        cssClass = 'slack-request';
+                    } else if (requestType === 'url_verification') {
+                        cssClass = 'url-verification';
                     } else if (requestType === 'event_callback') {
-                        typeLabel = ' - 事件回调';
+                        cssClass = 'event-callback';
                     }
+
+                    const badgeClass = source.isSlack ? 'source-slack' : 'source-browser';
 
                     return `
                     <div class="request-item ${cssClass}">
                         <div class="request-header">
-                            <span>请求 #${requests.length - index} (${req.method}${typeLabel})</span>
+                            <span>请求 #${requests.length - index} (${req.method})
+                                <span class="source-badge ${badgeClass}">${source.source}</span>
+                            </span>
                             <span class="timestamp">${new Date(req.timestamp).toLocaleString('zh-CN')}</span>
                         </div>
-                        ${req.url ? `<div><strong>URL:</strong> ${req.url}</div>` : ''}
-                        ${requestType === 'url_verification' && req.body?.challenge ?
-                            `<div style="background: #e8f5e8; padding: 8px; border-radius: 4px; margin: 8px 0;">
-                                <strong>✅ URL验证挑战:</strong> ${req.body.challenge}
-                            </div>` : ''}
-                        ${requestType === 'event_callback' && req.body?.event ?
-                            `<div style="background: #e8f4f8; padding: 8px; border-radius: 4px; margin: 8px 0;">
-                                <strong>📨 事件详情:</strong><br>
-                                <strong>类型:</strong> ${req.body.event.type || 'unknown'}
-                                ${req.body.event.subtype ? `<br><strong>子类型:</strong> ${req.body.event.subtype}` : ''}
-                                ${req.body.team_id ? `<br><strong>团队ID:</strong> ${req.body.team_id}` : ''}
-                                ${req.body.api_app_id ? `<br><strong>应用ID:</strong> ${req.body.api_app_id}` : ''}
-                                ${req.body.event.user ? `<br><strong>用户:</strong> ${req.body.event.user}` : ''}
-                                ${req.body.event.channel ? `<br><strong>频道:</strong> ${req.body.event.channel}` : ''}
-                                ${req.body.event.text ? `<br><strong>消息:</strong> ${req.body.event.text.length > 100 ? req.body.event.text.substring(0, 100) + '...' : req.body.event.text}` : ''}
-                                ${req.body.event.ts ? `<br><strong>时间戳:</strong> ${req.body.event.ts}` : ''}
-                                ${req.body.event_id ? `<br><strong>事件ID:</strong> ${req.body.event_id}` : ''}
-                            </div>` : ''}
-                        <div><strong>Headers:</strong></div>
-                        <div class="json-content">${JSON.stringify(req.headers, null, 2)}</div>
-                        <div><strong>Body:</strong></div>
-                        <div class="json-content">${JSON.stringify(req.body, null, 2)}</div>
+                        
+                        ${source.isSlack ? `
+                            <div style="background: #e8f5e8; padding: 8px; border-radius: 4px; margin: 8px 0;">
+                                <strong>🎉 Slack官方请求!</strong>
+                                ${req.eventType ? `<br><strong>事件类型:</strong> ${req.eventType}` : ''}
+                                ${req.eventSubType ? `<br><strong>子事件:</strong> ${req.eventSubType}` : ''}
+                                ${req.teamId ? `<br><strong>团队ID:</strong> ${req.teamId}` : ''}
+                                ${req.userId ? `<br><strong>用户ID:</strong> ${req.userId}` : ''}
+                                ${req.channelId ? `<br><strong>频道ID:</strong> ${req.channelId}` : ''}
+                                ${req.messageText ? `<br><strong>消息:</strong> ${req.messageText}` : ''}
+                                ${req.challenge ? `<br><strong>验证挑战:</strong> ✅` : ''}
+                            </div>
+                        ` : `
+                            <div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0;">
+                                <strong>来源:</strong> ${source.details}
+                            </div>
+                        `}
                     </div>
                 `;
                 }).join('');

@@ -8,6 +8,29 @@
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .request-item { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 4px; background: #f9f9f9; }
+        .request-item.slack-request { 
+            border: 2px solid #28a745; 
+            background: #d4edda; 
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
+        }
+        .request-item.browser-request { 
+            border: 1px solid #6c757d; 
+            background: #f8f9fa; 
+        }
+        .source-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .source-slack { background: #28a745; color: white; }
+        .source-browser { background: #6c757d; color: white; }
+        .source-unknown { background: #ffc107; color: black; }
+        .confidence-high { border-left: 4px solid #28a745; }
+        .confidence-medium { border-left: 4px solid #ffc107; }
+        .confidence-low { border-left: 4px solid #dc3545; }
         .success { background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin: 10px 0; }
         .error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; margin: 10px 0; }
         .info { background: #d1ecf1; color: #0c5460; padding: 10px; border-radius: 4px; margin: 10px 0; }
@@ -43,19 +66,48 @@
                 if (data.length === 0) {
                     resultsDiv.innerHTML = '<div class="info">暂无请求记录</div>';
                 } else {
-                    resultsDiv.innerHTML = data.map((req, index) => `
-                        <div class="request-item">
-                            <h4>请求 #${data.length - index} - ${req.method} ${req.url}</h4>
-                            <p><strong>时间:</strong> ${new Date(req.timestamp).toLocaleString()}</p>
-                            ${req.body?.type ? `<p><strong>类型:</strong> ${req.body.type}</p>` : ''}
-                            ${req.body?.event?.type ? `<p><strong>事件:</strong> ${req.body.event.type}</p>` : ''}
-                            ${req.body?.event?.text ? `<p><strong>消息:</strong> ${req.body.event.text}</p>` : ''}
-                            <details>
-                                <summary>详细信息</summary>
-                                <pre>${JSON.stringify(req, null, 2)}</pre>
-                            </details>
+                    resultsDiv.innerHTML = data.map((req, index) => {
+                        const source = req.source || { source: '未知', isSlack: false, confidence: 'low', details: '' };
+                        const cssClass = source.isSlack ? 'slack-request' : 'browser-request';
+                        const badgeClass = source.isSlack ? 'source-slack' : 
+                                         source.source.includes('浏览器') || source.source.includes('调试') ? 'source-browser' : 'source-unknown';
+                        const confidenceClass = `confidence-${source.confidence}`;
+                        
+                        return `
+                        <div class="request-item ${cssClass} ${confidenceClass}">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h4 style="margin: 0;">请求 #${data.length - index}</h4>
+                                <span class="source-badge ${badgeClass}">${source.source}</span>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                                <div><strong>时间:</strong> ${new Date(req.timestamp).toLocaleString()}</div>
+                                <div><strong>方法:</strong> ${req.method}</div>
+                                <div><strong>来源详情:</strong> ${source.details}</div>
+                                <div><strong>置信度:</strong> ${source.confidence}</div>
+                            </div>
+                            
+                            ${source.isSlack ? `
+                                <div style="background: rgba(40, 167, 69, 0.1); padding: 8px; border-radius: 4px; margin-top: 10px;">
+                                    <strong>🎉 Slack官方请求!</strong>
+                                    ${req.eventType ? `<br><strong>事件类型:</strong> ${req.eventType}` : ''}
+                                    ${req.eventSubType ? `<br><strong>子事件:</strong> ${req.eventSubType}` : ''}
+                                    ${req.teamId ? `<br><strong>团队ID:</strong> ${req.teamId}` : ''}
+                                    ${req.userId ? `<br><strong>用户ID:</strong> ${req.userId}` : ''}
+                                    ${req.channelId ? `<br><strong>频道ID:</strong> ${req.channelId}` : ''}
+                                    ${req.messageText ? `<br><strong>消息:</strong> ${req.messageText}` : ''}
+                                    ${req.challenge ? `<br><strong>验证挑战:</strong> ✅` : ''}
+                                </div>
+                            ` : ''}
+                            
+                            ${!source.isSlack && source.source.includes('调试') ? `
+                                <div style="background: rgba(108, 117, 125, 0.1); padding: 8px; border-radius: 4px; margin-top: 10px;">
+                                    <strong>🔧 调试页面请求</strong> - 这是你的测试请求
+                                </div>
+                            ` : ''}
                         </div>
-                    `).join('');
+                    `;
+                    }).join('');
                 }
                 
                 statusDiv.innerHTML = `<div class="success">✅ 加载完成，找到 ${data.length} 条记录</div>`;
