@@ -119,8 +119,15 @@
     <script>
         async function loadRequests() {
             try {
-                const response = await fetch('/api/requests');
-                const requests = await response.json();
+                // 先尝试从requests API获取
+                let response = await fetch('/api/requests');
+                let requests = await response.json();
+                
+                // 如果没有数据，尝试从webhook获取
+                if (!requests || requests.length === 0) {
+                    response = await fetch('/api/webhook?history=true');
+                    requests = await response.json();
+                }
 
                 const container = document.getElementById('requests-container');
 

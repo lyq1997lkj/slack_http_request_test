@@ -1,5 +1,6 @@
 // Vercel serverless function to handle Slack events
-import { addRequest, getRequests, clearRequests } from './storage.js';
+// 使用简单的内存存储（注意：在Vercel中可能不持久）
+let requestHistory = [];
 
 export default function handler(req, res) {
     // 记录所有请求（包括GET请求用于调试）
@@ -12,7 +13,13 @@ export default function handler(req, res) {
         url: req.url
     };
     
-    addRequest(requestData);
+    // 添加到历史记录
+    requestHistory.unshift(requestData);
+    if (requestHistory.length > 2) {
+        requestHistory = requestHistory.slice(0, 2);
+    }
+    
+    console.log('Request added to history. Total requests:', requestHistory.length);
     
     // 只处理POST请求
     if (req.method === 'POST') {
@@ -88,12 +95,18 @@ export default function handler(req, res) {
         return res.status(200).json({ ok: true });
     }
     
-    // GET请求 - 用于健康检查
+    // GET请求 - 用于健康检查，同时返回请求历史
     if (req.method === 'GET') {
+        // 如果请求路径包含 'history'，返回请求历史
+        if (req.url && req.url.includes('history')) {
+            return res.status(200).json(requestHistory);
+        }
+        
         return res.status(200).json({ 
             status: 'ok', 
             message: 'Slack webhook endpoint is running',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            totalRequests: requestHistory.length
         });
     }
     
@@ -171,9 +184,9 @@ function handleReactionAddedEvent(event, context) {
 
 // 导出函数供其他API使用
 export function getRequestHistory() {
-    return getRequests();
+    return requestHistory;
 }
 
 export function clearRequestHistory() {
-    clearRequests();
+    requestHistory = [];
 }
