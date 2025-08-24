@@ -1,13 +1,37 @@
 // Vercel serverless function to handle Slack events
-// 使用全局变量存储请求历史（注意：在生产环境中会在函数重启时丢失）
-global.requestHistory = global.requestHistory || [];
+import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+
 const MAX_REQUESTS = 2;
+const HISTORY_FILE = '/tmp/request_history.json';
+
+function getStoredHistory() {
+    try {
+        if (existsSync(HISTORY_FILE)) {
+            const data = readFileSync(HISTORY_FILE, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (error) {
+        console.log('Error reading history file:', error);
+    }
+    return [];
+}
+
+function saveHistory(history) {
+    try {
+        writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+    } catch (error) {
+        console.log('Error saving history file:', error);
+    }
+}
 
 function addToHistory(requestData) {
-    global.requestHistory.unshift(requestData);
-    if (global.requestHistory.length > MAX_REQUESTS) {
-        global.requestHistory = global.requestHistory.slice(0, MAX_REQUESTS);
+    const history = getStoredHistory();
+    history.unshift(requestData);
+    if (history.length > MAX_REQUESTS) {
+        history.splice(MAX_REQUESTS);
     }
+    saveHistory(history);
 }
 
 export default function handler(req, res) {
@@ -180,9 +204,9 @@ function handleReactionAddedEvent(event, context) {
 
 // 导出函数供其他API使用
 export function getRequestHistory() {
-    return global.requestHistory || [];
+    return getStoredHistory();
 }
 
 export function clearRequestHistory() {
-    global.requestHistory = [];
+    saveHistory([]);
 }
