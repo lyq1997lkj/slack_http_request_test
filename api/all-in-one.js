@@ -19,7 +19,16 @@ export default function handler(req, res) {
         const hasSlackTimestamp = !!headers['x-slack-request-timestamp'];
         const hasSlackRetry = !!headers['x-slack-retry-num'];
         const isSlackUserAgent = userAgent.includes('Slackbot') || userAgent.includes('Slack');
+        const contentType = headers['content-type'] || '';
+        const isSlackEvent = body && (body.type === 'url_verification' || body.type === 'event_callback');
         
+        // 记录所有请求头用于调试
+        console.log('Request headers:', Object.keys(headers).filter(key => key.toLowerCase().includes('slack')));
+        console.log('User-Agent:', userAgent);
+        console.log('Content-Type:', contentType);
+        console.log('Body type:', body?.type);
+        
+        // 最高优先级：有Slack签名和时间戳
         if (hasSlackSignature && hasSlackTimestamp) {
             return {
                 source: 'Slack官方',
@@ -29,15 +38,27 @@ export default function handler(req, res) {
             };
         }
         
+        // 高优先级：Slack事件类型 + JSON内容
+        if (isSlackEvent && contentType.includes('application/json')) {
+            return {
+                source: 'Slack事件',
+                isSlack: true,
+                confidence: 'high',
+                details: `事件类型: ${body.type}`
+            };
+        }
+        
+        // 中等优先级：Slack User-Agent
         if (isSlackUserAgent) {
             return {
                 source: 'Slack机器人',
                 isSlack: true,
                 confidence: 'medium',
-                details: 'User-Agent包含Slack标识'
+                details: `User-Agent: ${userAgent.substring(0, 50)}...`
             };
         }
         
+        // 检查是否是浏览器请求
         if (userAgent.includes('Mozilla') || userAgent.includes('Chrome') || userAgent.includes('Safari')) {
             const referer = headers['referer'] || '';
             if (referer.includes(headers['host'])) {
@@ -45,23 +66,34 @@ export default function handler(req, res) {
                     source: '调试页面',
                     isSlack: false,
                     confidence: 'high',
-                    details: `浏览器请求 (${userAgent.split(' ')[0]})`
+                    details: `浏览器测试 (${userAgent.split(' ')[0]})`
                 };
             }
             return {
                 source: '外部浏览器',
                 isSlack: false,
                 confidence: 'high',
-                details: `浏览器请求 (${userAgent.split(' ')[0]})`
+                details: `浏览器访问 (${userAgent.split(' ')[0]})`
             };
         }
         
+        // API工具
         if (userAgent.includes('curl') || userAgent.includes('wget') || userAgent.includes('Postman')) {
             return {
                 source: 'API工具',
                 isSlack: false,
                 confidence: 'high',
                 details: userAgent.split('/')[0]
+            };
+        }
+        
+        // 未知来源，但如果有Slack相关的body，可能是Slack请求
+        if (isSlackEvent) {
+            return {
+                source: '可能的Slack请求',
+                isSlack: true,
+                confidence: 'low',
+                details: `事件类型: ${body.type}, 但缺少签名`
             };
         }
         

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slack连接调试器</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .success { background: #d4edda; color: #155724; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .warning { background: #fff3cd; color: #856404; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .info { background: #d1ecf1; color: #0c5460; padding: 10px; border-radius: 4px; margin: 10px 0; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .request-item { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 4px; background: #f9f9f9; }
+        .slack-request { border: 2px solid #28a745; background: #d4edda; }
+        .source-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 10px; }
+        .source-slack { background: #28a745; color: white; }
+        .source-browser { background: #6c757d; color: white; }
+        .source-unknown { background: #ffc107; color: black; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        .checklist { list-style: none; padding: 0; }
+        .checklist li { padding: 5px 0; }
+        .checklist .check { color: #28a745; font-weight: bold; }
+        .checklist .cross { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Slack连接调试器</h1>
+        <p>帮你诊断为什么没有收到Slack官方请求</p>
+        
+        <div>
+            <button onclick="checkSlackConfig()">检查Slack配置</button>
+            <button onclick="loadHistory()">加载请求历史</button>
+            <button onclick="clearHistory()">清空历史</button>
+        </div>
+        
+        <div id="config-check"></div>
+    </div>
+    
+    <div class="container">
+        <h2>📋 Slack配置检查清单</h2>
+        <div id="checklist">
+            <ul class="checklist">
+                <li><span id="check1" class="cross">❌</span> Slack应用已创建</li>
+                <li><span id="check2" class="cross">❌</span> Event Subscriptions已启用</li>
+                <li><span id="check3" class="cross">❌</span> Request URL已配置并验证</li>
+                <li><span id="check4" class="cross">❌</span> 订阅了相关事件</li>
+                <li><span id="check5" class="cross">❌</span> 应用已安装到工作区</li>
+                <li><span id="check6" class="cross">❌</span> 机器人已添加到频道</li>
+                <li><span id="check7" class="cross">❌</span> 在频道中发送了消息</li>
+            </ul>
+        </div>
+        
+        <div class="info">
+            <strong>当前Webhook URL:</strong><br>
+            <code id="webhook-url"></code><br><br>
+            <strong>配置步骤:</strong><br>
+            1. 访问 <a href="https://api.slack.com/apps" target="_blank">Slack API控制台</a><br>
+            2. 选择你的应用 → Event Subscriptions<br>
+            3. 启用Events，设置Request URL为上面的URL<br>
+            4. 在"Subscribe to bot events"中添加: message.channels, app_mention<br>
+            5. 保存设置，然后安装应用到工作区<br>
+            6. 邀请机器人到频道: <code>/invite @你的机器人名称</code><br>
+            7. 在频道中发送消息或@提及机器人
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>📨 请求历史</h2>
+        <div id="status"></div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // 显示当前的webhook URL
+        document.getElementById('webhook-url').textContent = window.location.origin + '/api/all-in-one';
+        
+        async function checkSlackConfig() {
+            const configDiv = document.getElementById('config-check');
+            
+            try {
+                // 测试webhook端点
+                const response = await fetch('/api/all-in-one');
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    configDiv.innerHTML = `
+                        <div class="success">✅ Webhook端点正常运行</div>
+                        <div class="info">
+                            <strong>端点状态:</strong> ${data.message}<br>
+                            <strong>总请求数:</strong> ${data.totalRequests}<br>
+                            <strong>时间:</strong> ${new Date(data.timestamp).toLocaleString()}
+                        </div>
+                    `;
+                } else {
+                    configDiv.innerHTML = `<div class="error">❌ Webhook端点异常</div>`;
+                }
+            } catch (error) {
+                configDiv.innerHTML = `<div class="error">❌ 无法连接到webhook端点: ${error.message}</div>`;
+            }
+        }
+        
+        async function loadHistory() {
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                statusDiv.innerHTML = '<div class="info">正在加载请求历史...</div>';
+                
+                const response = await fetch('/api/all-in-one?action=history');
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    statusDiv.innerHTML = '<div class="warning">⚠️ 暂无请求记录 - 可能的原因见下方检查清单</div>';
+                    resultsDiv.innerHTML = '';
+                    return;
+                }
+                
+                // 统计请求类型
+                const slackRequests = data.filter(req => req.source?.isSlack);
+                const browserRequests = data.filter(req => !req.source?.isSlack);
+                
+                statusDiv.innerHTML = `
+                    <div class="success">✅ 找到 ${data.length} 条请求记录</div>
+                    <div class="info">
+                        🎯 Slack官方请求: ${slackRequests.length} 条<br>
+                        🌐 浏览器/测试请求: ${browserRequests.length} 条
+                    </div>
+                `;
+                
+                if (slackRequests.length === 0) {
+                    statusDiv.innerHTML += '<div class="warning">⚠️ 没有发现Slack官方请求，请检查配置</div>';
+                }
+                
+                resultsDiv.innerHTML = data.map((req, index) => {
+                    const source = req.source || { source: '未知', isSlack: false, confidence: 'low', details: '' };
+                    const cssClass = source.isSlack ? 'slack-request' : '';
+                    const badgeClass = source.isSlack ? 'source-slack' : 
+                                     source.source.includes('调试') ? 'source-browser' : 'source-unknown';
+                    
+                    return `
+                        <div class="request-item ${cssClass}">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h4>请求 #${data.length - index}</h4>
+                                <span class="source-badge ${badgeClass}">${source.source}</span>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; margin: 10px 0;">
+                                <div><strong>时间:</strong> ${new Date(req.timestamp).toLocaleString()}</div>
+                                <div><strong>方法:</strong> ${req.method}</div>
+                                <div><strong>来源:</strong> ${source.details}</div>
+                                <div><strong>置信度:</strong> ${source.confidence}</div>
+                            </div>
+                            
+                            ${source.isSlack ? `
+                                <div style="background: rgba(40, 167, 69, 0.2); padding: 10px; border-radius: 4px;">
+                                    <strong>🎉 这是Slack官方请求!</strong><br>
+                                    ${req.eventType ? `事件类型: ${req.eventType}<br>` : ''}
+                                    ${req.eventSubType ? `子事件: ${req.eventSubType}<br>` : ''}
+                                    ${req.teamId ? `团队ID: ${req.teamId}<br>` : ''}
+                                    ${req.messageText ? `消息: ${req.messageText}<br>` : ''}
+                                    ${req.challenge ? `URL验证: ✅<br>` : ''}
+                                </div>
+                            ` : `
+                                <div style="background: rgba(108, 117, 125, 0.1); padding: 10px; border-radius: 4px;">
+                                    <strong>ℹ️ 非Slack请求</strong><br>
+                                    这可能是测试请求或其他来源的请求
+                                </div>
+                            `}
+                            
+                            <details style="margin-top: 10px;">
+                                <summary>查看原始数据</summary>
+                                <pre>${JSON.stringify(req, null, 2)}</pre>
+                            </details>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ 加载失败: ${error.message}</div>`;
+            }
+        }
+        
+        async function clearHistory() {
+            try {
+                await fetch('/api/all-in-one?action=clear');
+                document.getElementById('status').innerHTML = '<div class="success">✅ 历史记录已清空</div>';
+                document.getElementById('results').innerHTML = '';
+            } catch (error) {
+                document.getElementById('status').innerHTML = `<div class="error">❌ 清空失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 页面加载时自动检查
+        window.onload = function() {
+            checkSlackConfig();
+            loadHistory();
+        };
+        
+        // 每30秒自动刷新
+        setInterval(loadHistory, 30000);
+    </script>
+</body>
+</html>
