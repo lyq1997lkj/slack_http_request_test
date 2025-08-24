@@ -185,6 +185,29 @@
                                 <strong>来源:</strong> ${source.details}
                             </div>
                         `}
+                        
+                        <div style="text-align: right; margin-top: 10px;">
+                            <button onclick="toggleDetails(${index})" style="background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 3px; font-size: 12px; cursor: pointer;">
+                                查看详细信息
+                            </button>
+                        </div>
+                        
+                        <div id="details-${index}" style="display: none; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
+                            <div style="margin-bottom: 10px;">
+                                <strong>📋 请求头:</strong>
+                                <div class="json-content" style="margin-top: 5px; max-height: 200px; overflow-y: auto;">${JSON.stringify(req.headers || {}, null, 2)}</div>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <strong>📦 请求体:</strong>
+                                <div class="json-content" style="margin-top: 5px; max-height: 200px; overflow-y: auto;">${JSON.stringify(req.body || {}, null, 2)}</div>
+                            </div>
+                            ${req.query && Object.keys(req.query).length > 0 ? `
+                                <div style="margin-bottom: 10px;">
+                                    <strong>🔍 查询参数:</strong>
+                                    <div class="json-content" style="margin-top: 5px;">${JSON.stringify(req.query, null, 2)}</div>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
                 `;
                 }).join('');
@@ -207,6 +230,22 @@
         // 页面加载时获取数据
         loadRequests();
 
+        // 切换详细信息显示
+        function toggleDetails(index) {
+            const detailsDiv = document.getElementById(`details-${index}`);
+            const button = event.target;
+            
+            if (detailsDiv.style.display === 'none') {
+                detailsDiv.style.display = 'block';
+                button.textContent = '隐藏详细信息';
+                button.style.background = '#dc3545';
+            } else {
+                detailsDiv.style.display = 'none';
+                button.textContent = '查看详细信息';
+                button.style.background = '#6c757d';
+            }
+        }
+        
         // 每30秒自动刷新
         setInterval(loadRequests, 30000);
     </script>

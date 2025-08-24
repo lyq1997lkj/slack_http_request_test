@@ -117,9 +117,27 @@ export default function handler(req, res) {
         eventSubType: req.body?.event?.type || null,
         challenge: req.body?.challenge ? 'present' : null,
         teamId: req.body?.team_id || null,
+        apiAppId: req.body?.api_app_id || null,
+        eventId: req.body?.event_id || null,
+        eventTime: req.body?.event_time || null,
         userId: req.body?.event?.user || null,
         channelId: req.body?.event?.channel || null,
-        messageText: req.body?.event?.text ? req.body.event.text.substring(0, 100) : null
+        messageText: req.body?.event?.text ? req.body.event.text.substring(0, 100) : null,
+        messageTs: req.body?.event?.ts || null,
+        threadTs: req.body?.event?.thread_ts || null,
+        // 存储关键的请求头
+        headers: {
+            'user-agent': req.headers['user-agent'],
+            'content-type': req.headers['content-type'],
+            'x-slack-signature': req.headers['x-slack-signature'],
+            'x-slack-request-timestamp': req.headers['x-slack-request-timestamp'],
+            'x-slack-retry-num': req.headers['x-slack-retry-num'],
+            'host': req.headers['host'],
+            'referer': req.headers['referer']
+        },
+        // 存储完整的body用于详细查看
+        body: req.body,
+        query: req.query
     };
     
     // 添加到历史记录

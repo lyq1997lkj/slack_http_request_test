@@ -170,10 +170,26 @@
                                 </div>
                             `}
                             
-                            <details style="margin-top: 10px;">
-                                <summary>查看原始数据</summary>
-                                <pre>${JSON.stringify(req, null, 2)}</pre>
-                            </details>
+                            <div style="margin-top: 10px;">
+                                <button onclick="toggleDetails(${index})" style="background: #6c757d; font-size: 12px; padding: 5px 10px;">
+                                    查看详细信息
+                                </button>
+                                <div id="details-${index}" style="display: none; margin-top: 10px;">
+                                    <h5>📋 请求头 (Headers)</h5>
+                                    <pre style="max-height: 200px; overflow-y: auto;">${JSON.stringify(req.headers || {}, null, 2)}</pre>
+                                    
+                                    <h5>📦 请求体 (Body)</h5>
+                                    <pre style="max-height: 200px; overflow-y: auto;">${JSON.stringify(req.body || {}, null, 2)}</pre>
+                                    
+                                    ${req.query && Object.keys(req.query).length > 0 ? `
+                                        <h5>🔍 查询参数 (Query)</h5>
+                                        <pre>${JSON.stringify(req.query, null, 2)}</pre>
+                                    ` : ''}
+                                    
+                                    <h5>🔧 完整请求数据</h5>
+                                    <pre style="max-height: 300px; overflow-y: auto;">${JSON.stringify(req, null, 2)}</pre>
+                                </div>
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -198,6 +214,22 @@
             checkSlackConfig();
             loadHistory();
         };
+        
+        // 切换详细信息显示
+        function toggleDetails(index) {
+            const detailsDiv = document.getElementById(`details-${index}`);
+            const button = event.target;
+            
+            if (detailsDiv.style.display === 'none') {
+                detailsDiv.style.display = 'block';
+                button.textContent = '隐藏详细信息';
+                button.style.background = '#dc3545';
+            } else {
+                detailsDiv.style.display = 'none';
+                button.textContent = '查看详细信息';
+                button.style.background = '#6c757d';
+            }
+        }
         
         // 每30秒自动刷新
         setInterval(loadHistory, 30000);

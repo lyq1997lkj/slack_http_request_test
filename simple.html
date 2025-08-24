@@ -105,6 +105,32 @@
                                     <strong>🔧 调试页面请求</strong> - 这是你的测试请求
                                 </div>
                             ` : ''}
+                            
+                            <div style="margin-top: 10px; text-align: right;">
+                                <button onclick="toggleDetails(${index})" style="background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 3px; font-size: 12px; cursor: pointer;">
+                                    查看详细信息
+                                </button>
+                            </div>
+                            
+                            <div id="details-${index}" style="display: none; margin-top: 10px; border-top: 1px solid #ddd; padding-top: 10px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                    <div>
+                                        <h5 style="margin: 0 0 5px 0; color: #495057;">📋 请求头</h5>
+                                        <pre style="font-size: 11px; max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 8px; border-radius: 3px;">${JSON.stringify(req.headers || {}, null, 2)}</pre>
+                                    </div>
+                                    <div>
+                                        <h5 style="margin: 0 0 5px 0; color: #495057;">📦 请求体</h5>
+                                        <pre style="font-size: 11px; max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 8px; border-radius: 3px;">${JSON.stringify(req.body || {}, null, 2)}</pre>
+                                    </div>
+                                </div>
+                                
+                                ${req.query && Object.keys(req.query).length > 0 ? `
+                                    <div style="margin-top: 10px;">
+                                        <h5 style="margin: 0 0 5px 0; color: #495057;">🔍 查询参数</h5>
+                                        <pre style="font-size: 11px; background: #f8f9fa; padding: 8px; border-radius: 3px;">${JSON.stringify(req.query, null, 2)}</pre>
+                                    </div>
+                                ` : ''}
+                            </div>
                         </div>
                     `;
                     }).join('');
@@ -164,6 +190,22 @@
         
         // 页面加载时自动加载历史
         loadHistory();
+        
+        // 切换详细信息显示
+        function toggleDetails(index) {
+            const detailsDiv = document.getElementById(`details-${index}`);
+            const button = event.target;
+            
+            if (detailsDiv.style.display === 'none') {
+                detailsDiv.style.display = 'block';
+                button.textContent = '隐藏详细信息';
+                button.style.background = '#dc3545';
+            } else {
+                detailsDiv.style.display = 'none';
+                button.textContent = '查看详细信息';
+                button.style.background = '#6c757d';
+            }
+        }
         
         // 每30秒自动刷新
         setInterval(loadHistory, 30000);
